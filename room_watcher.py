@@ -3,59 +3,55 @@ import urllib.request
 import urllib.error
 import os
 
-# הוובהוק החדש שלך
-WEBHOOK_URL = "https://discord.com/api/webhooks/1423983135183470624/NFKgKL82HUjpOpi5ot-nr-PKo_XbBJSd23TCmxYGHd3tEARGZzDH_Bxkn8YDb6zkjEde"
-
-# URL של ה-JSON
+WEBHOOK_URL = os.getenv("WEBHOOK_URL")
 JSON_URL = "https://play.tropy.co.il/data/rooms.json"
-
-# קובץ לשמירה והשוואה
 DATA_FILE = "previous.json"
 
-def send_to_discord(message):
-    """שולח הודעה לוובהוק"""
+def send_embed(title, description, color):
+    """שולח Embed לוובהוק"""
     if not WEBHOOK_URL:
         print("❌ WEBHOOK_URL לא מוגדר")
         return
+    embed = {
+        "embeds": [{
+            "title": title,
+            "description": description,
+            "color": color
+        }]
+    }
     try:
-        data = json.dumps({"content": message}).encode("utf-8")
+        data = json.dumps(embed).encode("utf-8")
         req = urllib.request.Request(WEBHOOK_URL, data=data, headers={"Content-Type": "application/json"})
         urllib.request.urlopen(req)
-        print("✅ הודעה נשלחה!")
+        print("✅ Embed נשלח!")
     except Exception as e:
-        print(f"❌ שגיאה בשליחת הודעה: {e}")
+        print(f"❌ שגיאה בשליחת Embed: {e}")
 
 def safe_load_json(path):
-    """טוען JSON בצורה בטוחה. אם הקובץ חסר או פגום, מחזיר רשימה ריקה"""
     if not os.path.exists(path):
         return []
     try:
         with open(path, "r", encoding="utf-8") as f:
             return json.load(f)
     except Exception as e:
-        print("⚠️ הקובץ previous.json פגום או לא קריא, איפוס:", e)
-        send_to_discord("⚠️ הקובץ previous.json היה פגום או לא קריא ולכן אופס.")
+        send_embed("⚠️ previous.json פגום", str(e), 0xFFFF00)
         with open(path, "w", encoding="utf-8") as f:
             f.write("[]")
         return []
 
 def save_data(data):
-    """שומר את הנתונים החדשים"""
     with open(DATA_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
 def fetch_new_data():
-    """מוריד את הנתונים מה-JSON"""
     try:
         with urllib.request.urlopen(JSON_URL) as response:
             return json.loads(response.read().decode("utf-8"))
-    except urllib.error.URLError as e:
-        print("❌ שגיאה בהורדת JSON:", e)
-        send_to_discord("❌ שגיאה בהורדת JSON: " + str(e))
+    except Exception as e:
+        send_embed("❌ שגיאה בהורדת JSON", str(e), 0xFF0000)
         return []
 
 def compare_data(old, new):
-    """משווה בין נתונים ישנים לחדשים לפי מזהה '0'"""
     old_ids = {str(item["0"]): item for item in old}
     new_ids = {str(item["0"]): item for item in new}
 
@@ -68,25 +64,20 @@ def compare_data(old, new):
 def main():
     old_data = safe_load_json(DATA_FILE)
     new_data = fetch_new_data()
-
     if not new_data:
-        print("❌ לא התקבל מידע חדש.")
-        send_to_discord("❌ לא התקבל מידע חדש.")
         return
 
     added, removed, updated = compare_data(old_data, new_data)
 
     if not added and not removed and not updated:
-        send_to_discord("ℹ️ אין שינויים בחדרים.")
+        send_embed("ℹ️ אין שינויים", "כל החדרים כפי שהם.", 0x808080)
     else:
-        msg = []
         if added:
-            msg.append(f"🟢 נוספו {len(added)} חדרים חדשים:\n" + "\n".join([r['1'] for r in added]))
+            send_embed("🟢 חדרים חדשים", "\n".join([r['1'] for r in added]), 0x00FF00)
         if removed:
-            msg.append(f"🔴 הוסרו {len(removed)} חדרים:\n" + "\n".join([r['1'] for r in removed]))
+            send_embed("🔴 חדרים הוסרו", "\n".join([r['1'] for r in removed]), 0xFF0000)
         if updated:
-            msg.append(f"🟡 עודכנו {len(updated)} חדרים:\n" + "\n".join([r['1'] for r in updated]))
-        send_to_discord("\n\n".join(msg))
+            send_embed("🟡 חדרים עודכנו", "\n".join([r['1'] for r in updated]), 0xFFFF00)
 
     save_data(new_data)
 
