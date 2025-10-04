@@ -3,17 +3,19 @@ name: Room Watcher
 on:
   schedule:
     - cron: "0 * * * *"  # כל שעה
-  workflow_dispatch:
+  workflow_dispatch:       # אפשר להפעיל ידנית
 
 jobs:
   check_rooms:
     runs-on: ubuntu-latest
-    env:
-      DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
-      GH_TOKEN: ${{ secrets.GH_TOKEN }}  # optional
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.x
 
       - name: Run Room Watcher
         run: python room_watcher.py
