@@ -1,10 +1,8 @@
 import json
 import urllib.request
 import os
-import subprocess
 
-# קבע את ה‑Webhook ב‑Secrets או בסביבה
-WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK")
+WEBHOOK_URL = "https://discord.com/api/webhooks/1423983135183470624/NFKgKL82HUjpOpi5ot-nr-PKo_XbBJSd23TCmxYGHd3tEARGZzDH_Bxkn8YDb6zkjEde"
 DATA_FILE = "previous.json"
 JSON_URL = "https://play.tropy.co.il/data/rooms.json"
 
@@ -43,30 +41,16 @@ def fetch_new_data():
 def compare_data(old, new):
     old_ids = {str(x["0"]): x for x in old}
     new_ids = {str(x["0"]): x for x in new}
+
     added = [new_ids[i] for i in new_ids if i not in old_ids]
     removed = [old_ids[i] for i in old_ids if i not in new_ids]
     updated = [new_ids[i] for i in new_ids if i in old_ids and new_ids[i] != old_ids[i]]
+
     return added, removed, updated
 
 def save_json(path, data):
     with open(path, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
-
-def git_commit_push():
-    GH_TOKEN = os.getenv("GH_TOKEN")
-    REPO = os.getenv("GITHUB_REPOSITORY")  # מסופק אוטומטית ב‑GitHub Actions
-    if not GH_TOKEN:
-        print("⚠️ GH_TOKEN לא מוגדר, push ל‑GitHub לא יתבצע")
-        return
-    try:
-        subprocess.run(["git", "config", "user.name", "github-actions"], check=True)
-        subprocess.run(["git", "config", "user.email", "actions@github.com"], check=True)
-        subprocess.run(["git", "add", DATA_FILE], check=True)
-        subprocess.run(["git", "commit", "-m", "Update previous.json"], check=True)
-        subprocess.run(["git", "push", f"https://{GH_TOKEN}@github.com/{REPO}.git", "HEAD:main"], check=True)
-        print("✅ previous.json עדכן ב-GitHub")
-    except subprocess.CalledProcessError as e:
-        print(f"❌ שגיאה ב-git: {e}")
 
 def main():
     old_data = load_json_safe(DATA_FILE)
@@ -79,15 +63,17 @@ def main():
     if not added and not removed and not updated:
         send_embed("ℹ️ אין שינויים", "כל החדרים כפי שהם.", 0x808080)
     else:
+        message = ""
         if added:
-            send_embed("🟢 חדרים חדשים", "\n".join([r['1'] for r in added]), 0x00FF00)
+            message += "🟢 **חדרים חדשים:**\n" + "\n".join([r['1'] for r in added]) + "\n\n"
         if removed:
-            send_embed("🔴 חדרים הוסרו", "\n".join([r['1'] for r in removed]), 0xFF0000)
+            message += "🔴 **חדרים הוסרו:**\n" + "\n".join([r['1'] for r in removed]) + "\n\n"
         if updated:
-            send_embed("🟡 חדרים עודכנו", "\n".join([r['1'] for r in updated]), 0xFFFF00)
+            message += "🟡 **חדרים עודכנו:**\n" + "\n".join([r['1'] for r in updated]) + "\n\n"
+        
+        send_embed("📝 סיכום שינויים בחדרים", message.strip(), 0x00AAFF)
 
     save_json(DATA_FILE, new_data)
-    git_commit_push()  # רק אם GH_TOKEN מוגדר
 
 if __name__ == "__main__":
     main()
