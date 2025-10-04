@@ -1,0 +1,26 @@
+name: Room Watcher
+
+on:
+  schedule:
+    - cron: "0 * * * *"  # כל שעה
+  workflow_dispatch:
+
+jobs:
+  check_rooms:
+    runs-on: ubuntu-latest
+    env:
+      WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK }}
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Run Python script
+        run: python room_watcher.py
+
+      - name: Commit updated JSON file
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add previous.json
+          git commit -m "Update previous.json" || echo "No changes to commit"
+          git push
